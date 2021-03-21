@@ -2,10 +2,17 @@ use std::io;
 use std::fs;
 use std::env;
 use std::path::Path;
+
 /* This is a simple command line tool to print the content of a directory as a
  * string. 
  * arguments: 
  * dir : The name of the dir to tree-ify; 
+ *
+ * TODO:
+ * - Print nodes as a tree (This is the goal);
+ * - Add feature for user to introduce a depth limit;
+ * - Add colours to base on the kind of node;
+ * - Refactor code to make it modular;
  */
 fn run(dir : &Path) -> io::Result<String> {
     let mut paths = String::new();
@@ -17,6 +24,7 @@ fn run(dir : &Path) -> io::Result<String> {
         );
     }
     Ok(paths)
+
 }
 
 fn parse_args(args : &Vec<String>) -> &Path{
