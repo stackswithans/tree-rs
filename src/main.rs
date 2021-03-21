@@ -3,6 +3,7 @@ use std::fs;
 use std::process;
 use std::env;
 use std::path::{Path, PathBuf};
+use std::ffi::OsStr;
 
 /* This is a simple command line tool to print the content of a directory as a
  * string. 
@@ -15,6 +16,7 @@ use std::path::{Path, PathBuf};
  * - Refactor code to make it modular;
  * - Add colours based on the kind of node; (Optional)
  * - Add "No argument show current dir tree" feature;
+ * - by default
  */
 
 
@@ -88,10 +90,13 @@ fn build_tree(parent: &mut Node, dir : &Path, depth : u64) -> io::Result<()>{
         let mut path_str = String::from(
             path
             .file_name()
-            .unwrap()
+            .unwrap_or(OsStr::new("")) // In case a path ends in ''
             .to_str()
             .unwrap()
         );
+        if path_str.starts_with("."){
+            continue;
+        }
         if path.is_dir(){
             path_str.push_str("/"); //Add slash to directories
             node = Node::new(path_str, NodeKind::Dir, depth);
@@ -107,7 +112,11 @@ fn build_tree(parent: &mut Node, dir : &Path, depth : u64) -> io::Result<()>{
 }
 
 fn run(dir : &Path) -> io::Result<()> {
-    let mut path = String::from(dir.file_name().unwrap().to_str().unwrap());
+    let mut path = String::from(dir
+        .file_name()
+        .unwrap_or(OsStr::new("")) // In case a path end in ''
+        .to_str().unwrap()
+    );
     path.push_str("/");
     let mut tree = Tree::new(path);
     build_tree(&mut tree.root, dir, 0)?;
@@ -117,7 +126,7 @@ fn run(dir : &Path) -> io::Result<()> {
 }
 
 fn parse_args(args : &Vec<String>) -> PathBuf{
-    if args.len() >= 2 {
+    if args.len() <= 1 {
         env::current_dir().unwrap() //Print current directory tree
     }
     else{
@@ -141,6 +150,7 @@ fn main() {
             println!("");
         },
         Err(error) => {
+            eprintln!("{:?}", error.kind());
             panic!("Some error that i do not care about for now has happened");
         }
     };
