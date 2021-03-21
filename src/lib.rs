@@ -37,41 +37,45 @@ impl Node{
         self.children.as_mut().unwrap().push(child);
     }
 
-    fn print_node(&self){
+    fn fmt_node(&self) -> String{
         let mut depth = String::new();
         for i in 0..self.depth{
             depth.push_str("---");
         }
-        println!("|{}{}",depth, self.path);
+        let mut display_str = format!("|{}{}\n",depth, self.path);
         if self.children.is_some(){
             for child in self.children.as_ref().unwrap(){
-                child.print_node();
+                display_str.push_str(&child.fmt_node());
             }
         }
+        display_str
     }
 }
 
 //Struct that represents the directory tree
 #[derive(Debug)]
-struct Tree{
+pub struct Tree{
     root: Node
 }
 
+//Initial depth for build idr
+const INIT_DEPTH : u64 = 1;
+
 
 impl Tree{
-    fn new(path: String) -> Tree{
+    pub fn new(path: String) -> Tree{
         Tree{
             root: Node::new(path, NodeKind::Dir, 0)
         }
     }
 
-    fn print_tree(&self){
-        self.root.print_node()
-
+    pub fn fmt_tree(&self) -> String{
+        self.root.fmt_node()
     }
 
 }
 
+//TODO: make this function a bit purer
 fn build_tree(parent: &mut Node, dir : &Path, depth : u64) -> io::Result<()>{
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -109,9 +113,9 @@ pub fn run(dir : &Path) -> io::Result<()> {
     );
     path.push_str("/");
     let mut tree = Tree::new(path);
-    build_tree(&mut tree.root, dir, 0)?;
+    build_tree(&mut tree.root, dir, INIT_DEPTH)?;
     //Print directory tree
-    tree.print_tree();
+    println!("{}", tree.fmt_tree());
     Ok(())
 }
 
@@ -120,7 +124,25 @@ mod tests{
     use std::fs::{DirBuilder, File};
     use std::fs;
     use super::Path;
-    use super::{Tree, Node, NodeKind};
+    use super::{Tree, Node, NodeKind, INIT_DEPTH};
+
+
+    fn setup(root : &Path){
+        //Create test data
+        let builder = DirBuilder::new();
+        builder.create(root).unwrap();
+        builder.create(root.join("foo")).unwrap();
+        builder.create(root.join("foo1")).unwrap();
+        File::create(root.join("foo.txt")).unwrap();
+    }
+
+    fn teardown(root: &Path){
+        //Clean up test data
+        fs::remove_dir(root.join("foo")).unwrap();
+        fs::remove_dir(root.join("foo1")).unwrap();
+        fs::remove_file(root.join("foo.txt")).unwrap();
+        fs::remove_dir(root).unwrap();
+    }
 
     #[test]
     fn test_new_tree(){
@@ -145,14 +167,8 @@ mod tests{
 
     #[test]
     fn test_build_tree(){
-        //Create test data
-        let builder = DirBuilder::new();
         let root = Path::new("./_test");
-        builder.create(root).unwrap();
-        builder.create(root.join("foo")).unwrap();
-        builder.create(root.join("foo1")).unwrap();
-        File::create(root.join("foo.txt")).unwrap();
-        
+        setup(root);
         let mut tree = Tree::new(
             root
             .file_name()
@@ -162,7 +178,7 @@ mod tests{
         );
         tree.root.path.push_str("/");
 
-        super::build_tree(&mut tree.root, root, 0).unwrap();
+        super::build_tree(&mut tree.root, root, INIT_DEPTH).unwrap();
 
         assert_eq!(tree.root.path, "_test/");
         assert_eq!(tree.root.kind, NodeKind::Dir);
@@ -176,20 +192,39 @@ mod tests{
                     assert_eq!(
                         node.children.as_ref()
                         .unwrap().len(), 0
-                    )},
+                    );
+                    assert_eq!(node.depth, 1);
+                },
                 ("foo1/", NodeKind::Dir) => {
                     assert_eq!(
                         node.children.as_ref()
                         .unwrap().len(), 0
-                    )},
-                ("foo.txt", NodeKind::File) => (),
+                    );
+                    assert_eq!(node.depth, 1);
+                },
+                ("foo.txt", NodeKind::File) => assert_eq!(node.depth, 1),
                 _ => panic!("Bad child node found")
             }
         }
-        //Clean up test data
-        fs::remove_dir(root.join("foo")).unwrap();
-        fs::remove_dir(root.join("foo1")).unwrap();
-        fs::remove_file(root.join("foo.txt")).unwrap();
-        fs::remove_dir(root).unwrap();
+        teardown(root);
+    }
+
+
+   #[test] 
+    fn test_tree_repr(){
+        let root = Path::new("./_test");
+        setup(root);
+        let mut tree = Tree::new(
+            root
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap().to_string(),
+        );
+        super::build_tree(&mut tree.root, root, INIT_DEPTH).unwrap();
+        tree.root.path.push_str("/");
+        let expected = "|_test/\n|---foo/\n|---foo1/\n|---foo.txt\n";
+        assert_eq!(tree.fmt_tree(), expected);
+        teardown(root);
     }
 }

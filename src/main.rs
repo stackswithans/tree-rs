@@ -10,7 +10,7 @@ extern crate treers;
  *
  * TODO:
  *** Print nodes as a tree (This is the goal);
- * - Add tests
+ *** Add tests
  * - Add feature for user to introduce a depth limit;
  * - Refactor code to make it modular;
  * - Add colours based on the kind of node; (Optional)
