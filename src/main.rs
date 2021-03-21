@@ -117,7 +117,7 @@ fn run(dir : &Path) -> io::Result<()> {
 }
 
 fn parse_args(args : &Vec<String>) -> PathBuf{
-    if args.len() < 2{
+    if args.len() >= 2 {
         env::current_dir().unwrap() //Print current directory tree
     }
     else{
