@@ -19,8 +19,6 @@ use std::ffi::OsStr;
  * - by default
  */
 
-
-
 //Tag that indicates the kind of node (File or Dir)
 enum NodeKind{
     Dir,
@@ -53,7 +51,11 @@ impl Node{
     }
 
     fn print_node(&self){
-        println!("| {}", self.path);
+        let mut depth = String::new();
+        for i in 0..self.depth{
+            depth.push_str("---");
+        }
+        println!("|{}{}",depth, self.path);
         if self.children.is_some(){
             for child in self.children.as_ref().unwrap(){
                 child.print_node();
