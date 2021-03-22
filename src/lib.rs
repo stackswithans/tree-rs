@@ -124,7 +124,7 @@ mod tests{
     use std::fs::{DirBuilder, File};
     use std::fs;
     use super::Path;
-    use super::{FsTree, FsNode, FsNodeKind, INIT_DEPTH};
+    use super::{FsTree, FsNode, FsNodeKind};
 
 
     fn setup(root : &Path){
