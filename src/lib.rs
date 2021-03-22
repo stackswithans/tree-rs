@@ -1,31 +1,30 @@
-
 use std::io;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
 
-//Tag that indicates the kind of node (File or Dir)
+//Tag that indicates the kind of fs_node (File or Dir)
 #[derive(Debug, PartialEq)]
-enum NodeKind{
+enum FsNodeKind{
     Dir,
     File
 }
 
 //Struct that represents a node in the file tree
 #[derive(Debug)]
-struct Node{
+struct FsNode{
      path : String,
-     kind : NodeKind,
+     kind : FsNodeKind,
      depth : u64,
-     children : Option<Vec<Node>> //File nodes do not have children
+     children : Option<Vec<FsNode>> //File nodes do not have children
 }
 
-impl Node{
-    fn new(path: String, kind : NodeKind, depth : u64) -> Node{
-        Node{
+impl FsNode{
+    fn new(path: String, kind : FsNodeKind, depth : u64) -> FsNode{
+        FsNode{
             children : match &kind{
-                NodeKind::Dir => Some(Vec::<Node>::new()), 
-                NodeKind::File => None
+                FsNodeKind::Dir => Some(Vec::<FsNode>::new()), 
+                FsNodeKind::File => None
             },
             path,
             kind,
@@ -33,7 +32,7 @@ impl Node{
         }
     }
 
-    fn add_child(&mut self, child: Node){
+    fn add_child(&mut self, child: FsNode){
         self.children.as_mut().unwrap().push(child);
     }
 
@@ -54,18 +53,14 @@ impl Node{
 
 //Struct that represents the directory tree
 #[derive(Debug)]
-pub struct Tree{
-    root: Node
+pub struct FsTree{
+    root: FsNode
 }
 
-//Initial depth for build idr
-const INIT_DEPTH : u64 = 1;
-
-
-impl Tree{
-    pub fn new(path: String) -> Tree{
-        Tree{
-            root: Node::new(path, NodeKind::Dir, 0)
+impl FsTree{
+    pub fn new(path: String) -> FsTree{
+        FsTree{
+            root: FsNode::new(path, FsNodeKind::Dir, 0)
         }
     }
 
@@ -76,7 +71,7 @@ impl Tree{
 }
 
 //TODO: make this function a bit purer
-fn build_tree(parent: &mut Node, dir : &Path, depth : u64) -> io::Result<()>{
+fn get_fs_nodes(parent: &mut FsNode, dir : &Path, depth : u64) -> io::Result<()>{
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path : PathBuf = entry.path();
@@ -93,27 +88,32 @@ fn build_tree(parent: &mut Node, dir : &Path, depth : u64) -> io::Result<()>{
         }
         if path.is_dir(){
             path_str.push_str("/"); //Add slash to directories
-            node = Node::new(path_str, NodeKind::Dir, depth);
-            build_tree(&mut node, path.as_path(), depth + 1)?;
+            node = FsNode::new(path_str, FsNodeKind::Dir, depth);
+            get_fs_nodes(&mut node, path.as_path(), depth + 1)?;
             parent.add_child(node);
         } 
         else{
-            node = Node::new(path_str, NodeKind::File, depth);
+            node = FsNode::new(path_str, FsNodeKind::File, depth);
             parent.add_child(node); 
         }
     }
     Ok(())
 }
 
-pub fn run(dir : &Path) -> io::Result<()> {
-    let mut path = String::from(dir
+fn build_fs_tree(root : &Path) -> io::Result<FsTree>{
+    let mut path = String::from(root
         .file_name()
         .unwrap_or(OsStr::new("")) // In case a path end in ''
         .to_str().unwrap()
     );
     path.push_str("/");
-    let mut tree = Tree::new(path);
-    build_tree(&mut tree.root, dir, INIT_DEPTH)?;
+    let mut tree = FsTree::new(path);
+    get_fs_nodes(&mut tree.root, root, 1)?;
+    return Ok(tree);
+}
+
+pub fn run(dir : &Path) -> io::Result<()> {
+    let tree = build_fs_tree(dir)?;
     //Print directory tree
     println!("{}", tree.fmt_tree());
     Ok(())
@@ -124,7 +124,7 @@ mod tests{
     use std::fs::{DirBuilder, File};
     use std::fs;
     use super::Path;
-    use super::{Tree, Node, NodeKind, INIT_DEPTH};
+    use super::{FsTree, FsNode, FsNodeKind, INIT_DEPTH};
 
 
     fn setup(root : &Path){
@@ -146,83 +146,64 @@ mod tests{
 
     #[test]
     fn test_new_tree(){
-        let tree = Tree::new(String::from("foo/"));
+        let tree = FsTree::new(String::from("foo/"));
         assert_eq!(tree.root.path, "foo/");
         assert_eq!(tree.root.children.unwrap().len(), 0);
-        assert_eq!(tree.root.kind, NodeKind::Dir);
+        assert_eq!(tree.root.kind, FsNodeKind::Dir);
     }
 
     #[test]
     fn test_file_node_children(){
-        let node = Node::new(
+        let node = FsNode::new(
             String::from("foo.txt"),
-            NodeKind::File, 
+            FsNodeKind::File, 
             1
         );
         assert_eq!(node.path, "foo.txt");
         assert_eq!(node.depth, 1);
         assert!(node.children.is_none());
-        assert_eq!(node.kind, NodeKind::File);
+        assert_eq!(node.kind, FsNodeKind::File);
     }
 
     #[test]
-    fn test_build_tree(){
+    fn test_build_fs_tree(){
         let root = Path::new("./_test");
         setup(root);
-        let mut tree = Tree::new(
-            root
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap().to_string(),
-        );
-        tree.root.path.push_str("/");
-
-        super::build_tree(&mut tree.root, root, INIT_DEPTH).unwrap();
-
+        let tree = super::build_fs_tree(root).unwrap();
         assert_eq!(tree.root.path, "_test/");
-        assert_eq!(tree.root.kind, NodeKind::Dir);
+        assert_eq!(tree.root.kind, FsNodeKind::Dir);
         assert_eq!(tree.root.children.as_ref().unwrap().len(), 3);
 
         //Only testing this way because there are no guarantees about
         //the sorting of the entries. There is probably a better to do this
         for node in tree.root.children.as_ref().unwrap(){
             match (node.path.as_str(), &node.kind) {
-                ("foo/", NodeKind::Dir) => {
+                ("foo/", FsNodeKind::Dir) => {
                     assert_eq!(
                         node.children.as_ref()
                         .unwrap().len(), 0
                     );
                     assert_eq!(node.depth, 1);
                 },
-                ("foo1/", NodeKind::Dir) => {
+                ("foo1/", FsNodeKind::Dir) => {
                     assert_eq!(
                         node.children.as_ref()
                         .unwrap().len(), 0
                     );
                     assert_eq!(node.depth, 1);
                 },
-                ("foo.txt", NodeKind::File) => assert_eq!(node.depth, 1),
+                ("foo.txt", FsNodeKind::File) => assert_eq!(node.depth, 1),
                 _ => panic!("Bad child node found")
             }
         }
         teardown(root);
     }
 
-
    #[test] 
     fn test_tree_repr(){
         let root = Path::new("./_test");
         setup(root);
-        let mut tree = Tree::new(
-            root
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap().to_string(),
-        );
-        super::build_tree(&mut tree.root, root, INIT_DEPTH).unwrap();
-        tree.root.path.push_str("/");
+        let tree = super::build_fs_tree(root).unwrap();
         let expected = "|_test/\n|---foo/\n|---foo1/\n|---foo.txt\n";
         assert_eq!(tree.fmt_tree(), expected);
         teardown(root);
