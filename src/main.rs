@@ -12,14 +12,14 @@ use treers::Options;
  *
  * TODO:
  *** Print nodes as a tree (This is the goal);
+ *** Refactor code to make it modular;
  *** Add tests
  *** Add "No argument show current dir tree" feature;
  *** Add flag for hidden files
+ * - Add count of files and subfolders 
  * - Add feature for user to introduce a depth limit;
- * - Refactor code to make it modular;
  * - Add colours based on the kind of node; (Optional)
  * - Add proper error handling
- * - by default
  */
 fn get_options(args : ArgMatches) -> Options{
     let mut path = PathBuf::new();
@@ -55,8 +55,8 @@ fn main(){
     }
 
     match treers::run(options){
-        Ok(()) => {
-            println!("");
+        Ok(tree_str) => {
+            println!("{}", tree_str);
         },
         Err(error) => {
             eprintln!("{:?}", error.kind());
