@@ -8,10 +8,27 @@ use std::ffi::OsStr;
 pub struct Options{
     pub dir: PathBuf,
     pub all : bool, //Traverse all nodes, including hidden nodes
+    pub count : bool, //Count the number of files and subdirs in dir
+}
+//Represents result return from the treeify_function
+pub struct DirData{
+    pub tree : String, 
+    pub subdirs : u32,
+    pub files : u32
+}
+
+impl DirData{
+    fn new(tree : String) -> Self{
+        DirData{
+            tree,
+            subdirs : 0,
+            files : 0, 
+        }
+    }
 }
 
 fn treeify_path(
-    tree_str : &mut String,
+    data : &mut DirData,
     dir : &Path,
     depth : u64,
     depth_str: String,
@@ -32,9 +49,10 @@ fn treeify_path(
         }
         if path.is_dir(){
             path_str.push_str("/"); //Add slash to directories
-            tree_str.push_str(&format!("|{}{}\n", depth_str, path_str));
+            data.tree.push_str(&format!("|{}{}\n", depth_str, path_str));
+            data.subdirs += 1;
             treeify_path(
-                tree_str, 
+                data, 
                 path.as_path(), 
                 depth + 1, 
                 format!("{}---", depth_str), all
@@ -42,13 +60,14 @@ fn treeify_path(
         } 
         else{
             //TODO: Add logic for symlinks
-            tree_str.push_str(&format!("|{}{}\n", depth_str, path_str));
+            data.files += 1;
+            data.tree.push_str(&format!("|{}{}\n", depth_str, path_str));
         }
     }
     Ok(())
 }
 
-pub fn run(options : Options) -> io::Result<String> {
+pub fn run(options : &Options) -> io::Result<DirData> {
     //Add root dir string
     let mut tree_str = String::from("|");
     tree_str.push_str(
@@ -58,15 +77,16 @@ pub fn run(options : Options) -> io::Result<String> {
         .to_str().unwrap()
     );
     tree_str.push_str("/\n");
+    let mut dir_data = DirData::new(tree_str);
     treeify_path(
-        &mut tree_str,
+        &mut dir_data,
         options.dir.as_path(), 
         1,
         String::from("---"),
         options.all
     )?;
     //Print directory tree
-    Ok(tree_str)
+    Ok(dir_data)
 }
 
 #[cfg(test)]
@@ -100,11 +120,12 @@ mod tests{
         setup(root);
         let options = Options{
             dir : root.to_path_buf(),
-            all : false 
+            all : false,
+            count : false
         };
-        let tree = super::run(options).unwrap();
+        let result = super::run(&options).unwrap();
         let expected = "|_test/\n|---foo/\n|---foo1/\n|---foo.txt\n";
-        assert_eq!(tree, expected);
+        assert_eq!(result.tree, expected);
         teardown(root);
     }
 
@@ -114,11 +135,29 @@ mod tests{
         setup(root);
         let options = Options{
             dir : root.to_path_buf(),
-            all : true 
+            all : true,
+            count : false
         };
-        let tree = super::run(options).unwrap();
+        let result = super::run(&options).unwrap();
         let expected = "|_test/\n|---.foo2/\n|---foo/\n|---foo1/\n|---foo.txt\n";
-        assert_eq!(tree, expected);
+        assert_eq!(result.tree, expected);
+        teardown(root);
+    }
+
+    #[test]
+    fn test_run_with_count_true(){
+        let root = Path::new("./_test");
+        setup(root);
+        let options = Options{
+            dir : root.to_path_buf(),
+            all : true,  
+            count: true  
+        };
+        let result = super::run(&options).unwrap();
+        let expected = "|_test/\n|---.foo2/\n|---foo/\n|---foo1/\n|---foo.txt\n";
+        assert_eq!(result.tree, expected);
+        assert_eq!(result.subdirs, 3);
+        assert_eq!(result.files, 1);
         teardown(root);
     }
 }

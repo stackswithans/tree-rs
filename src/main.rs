@@ -16,7 +16,7 @@ use treers::Options;
  *** Add tests
  *** Add "No argument show current dir tree" feature;
  *** Add flag for hidden files
- * - Add count of files and subfolders 
+ *** Add count of files and subfolders 
  * - Add feature for user to introduce a depth limit;
  * - Add colours based on the kind of node; (Optional)
  * - Add proper error handling
@@ -27,6 +27,7 @@ fn get_options(args : ArgMatches) -> Options{
     Options{
         dir: path,
         all: args.is_present("all"),
+        count: args.is_present("count"),
     }
 }
 
@@ -46,6 +47,10 @@ fn main(){
                            .short("a")
                            .help("Show all files and dirs.")
                            )
+                      .arg(Arg::with_name("count")
+                           .short("c")
+                           .help("Show number of files and subdirectories in DIR.")
+                           )
                       .get_matches();
     let options = get_options(matches); 
     //Check if file is a directory
@@ -54,9 +59,15 @@ fn main(){
         process::exit(1);
     }
 
-    match treers::run(options){
-        Ok(tree_str) => {
-            println!("{}", tree_str);
+    match treers::run(&options){
+        Ok(result) => {
+            println!("{}", result.tree);
+            if options.count{
+                println!("Found {} Subdirectories and {} files",
+                          result.subdirs, 
+                          result.files
+                );
+            }
         },
         Err(error) => {
             eprintln!("{:?}", error.kind());
