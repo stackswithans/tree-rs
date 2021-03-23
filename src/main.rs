@@ -46,11 +46,6 @@ fn main(){
                            .short("a")
                            .help("Show all files and dirs.")
                            )
-                      .arg(Arg::with_name("v")
-                           .short("v")
-                           .multiple(true)
-                           .help("Sets the level of verbosity")
-                           )
                       .get_matches();
     let options = get_options(matches); 
     //Check if file is a directory
