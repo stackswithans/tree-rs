@@ -3,6 +3,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
 
+
+//Stores options to be used during tree building
+pub struct Options{
+    pub dir: PathBuf,
+    pub all : bool, //Traverse all nodes, including hidden nodes
+}
+
 //Tag that indicates the kind of fs_node (File or Dir)
 #[derive(Debug, PartialEq)]
 enum FsNodeKind{
@@ -38,7 +45,7 @@ impl FsNode{
 
     fn fmt_node(&self) -> String{
         let mut depth = String::new();
-        for i in 0..self.depth{
+        for _i in 0..self.depth{
             depth.push_str("---");
         }
         let mut display_str = format!("|{}{}\n",depth, self.path);
@@ -71,7 +78,7 @@ impl FsTree{
 }
 
 //TODO: make this function a bit purer
-fn get_fs_nodes(parent: &mut FsNode, dir : &Path, depth : u64) -> io::Result<()>{
+fn get_fs_nodes(parent: &mut FsNode, dir : &Path, depth : u64, all : bool) -> io::Result<()>{
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path : PathBuf = entry.path();
@@ -83,13 +90,13 @@ fn get_fs_nodes(parent: &mut FsNode, dir : &Path, depth : u64) -> io::Result<()>
             .to_str()
             .unwrap()
         );
-        if path_str.starts_with("."){ // Make this optional base on params
+        if path_str.starts_with(".") && !all{ // Make this optional base on params
             continue;
         }
         if path.is_dir(){
             path_str.push_str("/"); //Add slash to directories
             node = FsNode::new(path_str, FsNodeKind::Dir, depth);
-            get_fs_nodes(&mut node, path.as_path(), depth + 1)?;
+            get_fs_nodes(&mut node, path.as_path(), depth + 1, all)?;
             parent.add_child(node);
         } 
         else{
@@ -100,7 +107,7 @@ fn get_fs_nodes(parent: &mut FsNode, dir : &Path, depth : u64) -> io::Result<()>
     Ok(())
 }
 
-fn build_fs_tree(root : &Path) -> io::Result<FsTree>{
+fn build_fs_tree(root : &Path, all : bool) -> io::Result<FsTree>{
     let mut path = String::from(root
         .file_name()
         .unwrap_or(OsStr::new("")) // In case a path end in ''
@@ -108,12 +115,12 @@ fn build_fs_tree(root : &Path) -> io::Result<FsTree>{
     );
     path.push_str("/");
     let mut tree = FsTree::new(path);
-    get_fs_nodes(&mut tree.root, root, 1)?;
+    get_fs_nodes(&mut tree.root, root, 1, all)?;
     return Ok(tree);
 }
 
-pub fn run(dir : &Path) -> io::Result<()> {
-    let tree = build_fs_tree(dir)?;
+pub fn run(options : Options) -> io::Result<()> {
+    let tree = build_fs_tree(options.dir.as_path(), options.all)?;
     //Print directory tree
     println!("{}", tree.fmt_tree());
     Ok(())
@@ -133,6 +140,7 @@ mod tests{
         builder.create(root).unwrap();
         builder.create(root.join("foo")).unwrap();
         builder.create(root.join("foo1")).unwrap();
+        builder.create(root.join(".foo2")).unwrap();
         File::create(root.join("foo.txt")).unwrap();
     }
 
@@ -140,6 +148,7 @@ mod tests{
         //Clean up test data
         fs::remove_dir(root.join("foo")).unwrap();
         fs::remove_dir(root.join("foo1")).unwrap();
+        fs::remove_dir(root.join(".foo2")).unwrap();
         fs::remove_file(root.join("foo.txt")).unwrap();
         fs::remove_dir(root).unwrap();
     }
@@ -169,7 +178,7 @@ mod tests{
     fn test_build_fs_tree(){
         let root = Path::new("./_test");
         setup(root);
-        let tree = super::build_fs_tree(root).unwrap();
+        let tree = super::build_fs_tree(root, false).unwrap();
         assert_eq!(tree.root.path, "_test/");
         assert_eq!(tree.root.kind, FsNodeKind::Dir);
         assert_eq!(tree.root.children.as_ref().unwrap().len(), 3);
@@ -203,8 +212,18 @@ mod tests{
     fn test_tree_repr(){
         let root = Path::new("./_test");
         setup(root);
-        let tree = super::build_fs_tree(root).unwrap();
+        let tree = super::build_fs_tree(root, false).unwrap();
         let expected = "|_test/\n|---foo/\n|---foo1/\n|---foo.txt\n";
+        assert_eq!(tree.fmt_tree(), expected);
+        teardown(root);
+    }
+
+    #[test]
+    fn test_tree_hidden_files(){
+        let root = Path::new("./_test");
+        setup(root);
+        let tree = super::build_fs_tree(root, true).unwrap();
+        let expected = "|_test/\n|---.foo2/\n|---foo/\n|---foo1/\n|---foo.txt\n";
         assert_eq!(tree.fmt_tree(), expected);
         teardown(root);
     }

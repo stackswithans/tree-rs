@@ -1,7 +1,9 @@
 use std::process;
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
+use clap::{Arg, App, ArgMatches};
 extern crate treers;
+use treers::Options;
 
 /* This is a simple command line tool to print the content of a directory as a
  * string. 
@@ -11,34 +13,53 @@ extern crate treers;
  * TODO:
  *** Print nodes as a tree (This is the goal);
  *** Add tests
+ *** Add "No argument show current dir tree" feature;
+ *** Add flag for hidden files
  * - Add feature for user to introduce a depth limit;
  * - Refactor code to make it modular;
  * - Add colours based on the kind of node; (Optional)
- * - Add "No argument show current dir tree" feature;
  * - Add proper error handling
  * - by default
  */
-fn parse_args(args : &Vec<String>) -> PathBuf{
-    if args.len() <= 1 {
-        env::current_dir().unwrap() //Print current directory tree
-    }
-    else{
-        Path::new(&args[1]).to_path_buf() 
+fn get_options(args : ArgMatches) -> Options{
+    let mut path = PathBuf::new();
+    path.push(args.value_of("dir").unwrap());
+    Options{
+        dir: path,
+        all: args.is_present("all"),
     }
 }
 
 fn main(){
-    let args : Vec<String> = env::args().collect();
-    //Check if correct number of arguments have been supplied
-    let dir = parse_args(&args); 
-    
+    let default_path = env::current_dir().unwrap();
+    let matches = App::new("treers")
+                      .version("0.1")
+                      .author("Sténio J. <stexor12@gmail.com>")
+                      .about("A simple command line program for showing contents of a directory as a tree")
+                      .arg(Arg::with_name("dir")
+                           .required(true)
+                           .value_name("DIR")
+                           .default_value(default_path.to_str().unwrap())
+                           .help("Path of directory to 'tree-ify'.")
+                           )
+                      .arg(Arg::with_name("all")
+                           .short("a")
+                           .help("Show all files and dirs.")
+                           )
+                      .arg(Arg::with_name("v")
+                           .short("v")
+                           .multiple(true)
+                           .help("Sets the level of verbosity")
+                           )
+                      .get_matches();
+    let options = get_options(matches); 
     //Check if file is a directory
-    if !dir.is_dir(){
-        eprintln!("{:?} is not a directory.", dir.canonicalize().unwrap());
+    if !options.dir.is_dir(){
+        eprintln!("{:?} is not a directory.", options.dir.canonicalize().unwrap());
         process::exit(1);
     }
 
-    match treers::run(dir.as_path()){
+    match treers::run(options){
         Ok(()) => {
             println!("");
         },
