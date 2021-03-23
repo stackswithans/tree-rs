@@ -54,7 +54,7 @@ fn main(){
     let options = get_options(matches); 
     //Check if file is a directory
     if !options.dir.is_dir(){
-        eprintln!("{:?} is not a directory.", options.dir.canonicalize().unwrap());
+        eprintln!("{:?} is not a directory.", options.dir);
         process::exit(1);
     }
 
