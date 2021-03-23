@@ -1,5 +1,5 @@
 [package]
-name = "treers"
+name = "fstree"
 version = "0.1.0"
 authors = ["stackswithans <stexor12@gmail.com>"]
 edition = "2018"

@@ -2,8 +2,7 @@ use std::process;
 use std::env;
 use std::path::{PathBuf};
 use clap::{Arg, App, ArgMatches};
-extern crate treers;
-use treers::Options;
+use fstree::Options;
 
 /* This is a simple command line tool to print the content of a directory as a
  * string. 
@@ -59,7 +58,7 @@ fn main(){
         process::exit(1);
     }
 
-    match treers::run(&options){
+    match fstree::run(&options){
         Ok(result) => {
             println!("{}", result.tree);
             if options.count{
