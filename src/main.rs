@@ -16,7 +16,6 @@ use fstree::Options;
  *** Add "No argument show current dir tree" feature;
  *** Add flag for hidden files
  *** Add count of files and subfolders 
- * - Add feature for user to introduce a depth limit;
  * - Add colours based on the kind of node; (Optional)
  * - Add proper error handling
  */
@@ -27,6 +26,7 @@ fn get_options(args : ArgMatches) -> Options{
         dir: path,
         all: args.is_present("all"),
         count: args.is_present("count"),
+        files: args.is_present("file"),
     }
 }
 
@@ -35,20 +35,24 @@ fn main(){
     let matches = App::new("treers")
                       .version("0.1")
                       .author("Sténio J. <stexor12@gmail.com>")
-                      .about("A simple command line program for showing contents of a directory as a tree")
+                      .about("A simple command line program for showing directory paths and  (optionally) the file in each subdirectory")
                       .arg(Arg::with_name("dir")
                            .required(true)
                            .value_name("DIR")
                            .default_value(default_path.to_str().unwrap())
                            .help("Path of directory to 'tree-ify'.")
                            )
+                      .arg(Arg::with_name("file")
+                           .short("f")
+                           .help("Show the files in each subdirectory.")
+                           )
                       .arg(Arg::with_name("all")
                            .short("a")
-                           .help("Show all files and dirs.")
+                           .help("Show all subdirectories and (optionally) files in DIR.")
                            )
                       .arg(Arg::with_name("count")
                            .short("c")
-                           .help("Show number of files and subdirectories in DIR.")
+                           .help("Show number of subdirectories and (optionally) files in DIR.")
                            )
                       .get_matches();
     let options = get_options(matches); 
@@ -62,10 +66,14 @@ fn main(){
         Ok(result) => {
             println!("{}", result.tree);
             if options.count{
-                println!("Found {} Subdirectories and {} files",
+                if options.files{
+                    println!("Found {} Subdirectories and {} files",
                           result.subdirs, 
                           result.files
-                );
+                    );
+                }else{
+                    println!("Found {} Subdirectories",result.subdirs);
+                }
             }
         },
         Err(error) => {

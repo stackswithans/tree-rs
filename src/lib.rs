@@ -9,6 +9,7 @@ pub struct Options{
     pub dir: PathBuf,
     pub all : bool, //Traverse all nodes, including hidden nodes
     pub count : bool, //Count the number of files and subdirs in dir
+    pub files : bool, //Show the files in each subdirectory
 }
 //Represents result return from the treeify_function
 pub struct DirData{
@@ -33,6 +34,7 @@ fn treeify_path(
     depth : u64,
     depth_str: String,
     all : bool,
+    files : bool,
 ) -> io::Result<()>{
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -55,11 +57,14 @@ fn treeify_path(
                 data, 
                 path.as_path(), 
                 depth + 1, 
-                format!("{}---", depth_str), all
+                format!("{}---", depth_str), all, files
             )?;
         } 
         else{
             //TODO: Add logic for symlinks
+            if !files{
+                continue; 
+            }
             data.files += 1;
             data.tree.push_str(&format!("|{}{}\n", depth_str, path_str));
         }
@@ -83,7 +88,8 @@ pub fn run(options : &Options) -> io::Result<DirData> {
         options.dir.as_path(), 
         1,
         String::from("---"),
-        options.all
+        options.all, 
+        options.files, 
     )?;
     //Print directory tree
     Ok(dir_data)
@@ -121,7 +127,24 @@ mod tests{
         let options = Options{
             dir : root.to_path_buf(),
             all : false,
-            count : false
+            count : false,
+            files : false
+        };
+        let result = super::run(&options).unwrap();
+        let expected = "|_test/\n|---foo/\n|---foo1/\n";
+        assert_eq!(result.tree, expected);
+        teardown(root);
+    }
+
+    #[test]
+    fn test_run_with_files(){
+        let root = Path::new("./_test");
+        setup(root);
+        let options = Options{
+            dir : root.to_path_buf(),
+            all : false,
+            count : false,
+            files : true
         };
         let result = super::run(&options).unwrap();
         let expected = "|_test/\n|---foo/\n|---foo1/\n|---foo.txt\n";
@@ -136,7 +159,8 @@ mod tests{
         let options = Options{
             dir : root.to_path_buf(),
             all : true,
-            count : false
+            count : false,
+            files : true
         };
         let result = super::run(&options).unwrap();
         let expected = "|_test/\n|---.foo2/\n|---foo/\n|---foo1/\n|---foo.txt\n";
@@ -151,7 +175,8 @@ mod tests{
         let options = Options{
             dir : root.to_path_buf(),
             all : true,  
-            count: true  
+            count: true,  
+            files : true
         };
         let result = super::run(&options).unwrap();
         let expected = "|_test/\n|---.foo2/\n|---foo/\n|---foo1/\n|---foo.txt\n";
